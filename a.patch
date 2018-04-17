@@ -1,0 +1,72 @@
+--- src/malloc_hook_mmap_linux.h	2018-04-18 03:18:35.993064405 +0900
++++ src/malloc_hook_mmap_linux.h	2018-04-18 03:18:45.040220663 +0900
+@@ -46,6 +46,10 @@
+ #include <errno.h>
+ #include "base/linux_syscall_support.h"
+ 
++#ifndef off64_t
++#define off64_t __off64_t
++#endif
++
+ // The x86-32 case and the x86-64 case differ:
+ // 32b has a mmap2() syscall, 64b does not.
+ // 64b and 32b have different calling conventions for mmap().
+@@ -60,7 +64,7 @@
+ 
+ static inline void* do_mmap64(void *start, size_t length,
+                               int prot, int flags,
+-                              int fd, __off64_t offset) __THROW {
++                              int fd, off64_t offset) __THROW {
+   return sys_mmap(start, length, prot, flags, fd, offset);
+ }
+ 
+@@ -71,7 +75,7 @@
+ 
+ static inline void* do_mmap64(void *start, size_t length,
+                               int prot, int flags,
+-                              int fd, __off64_t offset) __THROW {
++                              int fd, off64_t offset) __THROW {
+   void *result;
+ 
+   // Try mmap2() unless it's not supported
+@@ -141,9 +145,11 @@
+ # undef mmap
+ 
+ extern "C" {
++#ifndef mmap64
+   void* mmap64(void *start, size_t length, int prot, int flags,
+-               int fd, __off64_t offset  ) __THROW
++               int fd, off64_t offset  ) __THROW
+     ATTRIBUTE_SECTION(malloc_hook);
++#endif
+   void* mmap(void *start, size_t length,int prot, int flags,
+              int fd, off_t offset) __THROW
+     ATTRIBUTE_SECTION(malloc_hook);
+@@ -156,8 +162,9 @@
+     ATTRIBUTE_SECTION(malloc_hook);
+ }
+ 
++#ifndef mmap64
+ extern "C" void* mmap64(void *start, size_t length, int prot, int flags,
+-                        int fd, __off64_t offset) __THROW {
++                        int fd, off64_t offset) __THROW {
+   MallocHook::InvokePreMmapHook(start, length, prot, flags, fd, offset);
+   void *result;
+   if (!MallocHook::InvokeMmapReplacement(
+@@ -167,6 +174,7 @@
+   MallocHook::InvokeMmapHook(result, start, length, prot, flags, fd, offset);
+   return result;
+ }
++#endif
+ 
+ # if !defined(__USE_FILE_OFFSET64) || !defined(__REDIRECT_NTH)
+ 
+@@ -206,7 +214,7 @@
+   return result;
+ }
+ 
+-#ifndef __UCLIBC__
++#if defined(__GLIBC__) && ! defined(__UCLIBC__)
+ // libc's version:
+ extern "C" void* __sbrk(ptrdiff_t increment);
+ 
